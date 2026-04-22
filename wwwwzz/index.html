@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>一周七天 · 低调健身中</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fafafa;
+        }
+        h1 { color: #333; margin-bottom: 5px; }
+        .subtitle { color: #666; margin-top: 0; }
+        #current-date { font-size: 1.1em; margin: 10px 0; color: #555; }
+        .days-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin: 20px 0;
+        }
+        #days-counter { font-size: 1.2em; margin: 0; }
+        .settings-btn {
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+        .date-picker-panel {
+            display: none;
+            margin-top: 10px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .date-picker-panel.show { display: block; }
+        .date-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .date-input-row input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            flex: 1;
+        }
+        .date-input-row button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .week-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin: 30px 0;
+        }
+        .day-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 10px 5px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .day-name { font-weight: bold; margin-bottom: 4px; }
+        .day-date { font-size: 0.75em; color: #888; margin-bottom: 6px; }
+        .day-status { font-size: 0.8em; margin-bottom: 8px; min-height: 20px; }
+        .check-btn {
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 20px;
+            padding: 6px 10px;
+            font-size: 0.8em;
+            cursor: pointer;
+            width: 100%;
+        }
+        .check-btn.completed { background-color: #4CAF50; color: white; }
+        .reset-area { margin-top: 30px; text-align: right; }
+        .reset-btn {
+            background: none;
+            border: 1px solid #ccc;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        .footer-note {
+            margin-top: 40px;
+            color: #aaa;
+            font-size: 0.8em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>低调健身中</h1>
+    <p class="subtitle">一周七天 · 打卡记录</p >
+
+    <div id="current-date"></div>
+
+    <div class="days-container">
+        <div id="days-counter">正在计算...</div>
+        <button class="settings-btn" onclick="window.toggleDatePicker()">⚙️ 设置起始日</button>
+    </div>
+
+    <div id="datePickerPanel" class="date-picker-panel">
+        <p style="margin-top:0; color:#666;">选择你开始变好的那一天：</p >
+        <div class="date-input-row">
+            <input type="date" id="startDateInput">
+            <button onclick="window.saveStartDate()">保存</button>
+        </div>
+        <p style="font-size:0.8em; color:#999; margin-bottom:0;">修改后坚持天数将重新计算</p >
+    </div>
+
+    <div class="week-grid" id="week-grid"></div>
+
+    <div class="reset-area">
+        <button class="reset-btn" onclick="window.resetWeek()">重置本周</button>
+    </div>
+
+    <div class="footer-note">
+        数据保存在你的手机/电脑里<br>
+        换设备不会同步，但会一直陪着你
+    </div>
+
+    <script>
+        // 确保所有函数挂载到 window，便于 onclick 调用
+        window.toggleDatePicker = toggleDatePicker;
+        window.saveStartDate = saveStartDate;
+        window.resetWeek = resetWeek;
+
+        // ========== 工具函数 ==========
+        function formatDateYMD(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}年${month}月${day}日`;
+        }
+
+        function formatShortDate(date) {
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        }
+
+        function getMondayOfCurrentWeek() {
+            const now = new Date();
+            const day = now.getDay();
+            const diff = (day === 0 ? 6 : day - 1);
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - diff);
+            monday.setHours(0,0,0,0);
+            return monday;
+        }
+
+        function getWeekDatesFromMonday(monday) {
+            const dates = [];
+            for (let i=0; i<7; i++) {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                dates.push(d);
+            }
+            return dates;
+        }
+
+        // ========== 当前日期显示 ==========
+        function displayCurrentDate() {
+            const now = new Date();
+            const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            document.getElementById('current-date').innerHTML = `📅 ${formatDateYMD(now)} ${weekdays[now.getDay()]}`;
+        }
+        displayCurrentDate();
+
+        // ========== 起始日期管理 ==========
+        const DEFAULT_START_DATE = '2026-04-20';
+        
+        function getStoredStartDate() {
+            return localStorage.getItem('startDate') || DEFAULT_START_DATE;
+        }
+
+        function saveStartDateToStorage(dateStr) {
+            localStorage.setItem('startDate', dateStr);
+        }
+
+        function updateDaysCounter() {
+            const startStr = getStoredStartDate();
+            const start = new Date(startStr);
+            const today = new Date();
+            start.setHours(0,0,0,0);
+            today.setHours(0,0,0,0);
+            const diffDays = Math.floor((today - start) / (1000*60*60*24)) + 1;
+            document.getElementById('days-counter').innerHTML = `📆 我已经低调地变好了 ${diffDays} 天`;
+        }
+
+        function initDatePicker() {
+            document.getElementById('startDateInput').value = getStoredStartDate();
+        }
+
+        function toggleDatePicker() {
+            const panel = document.getElementById('datePickerPanel');
+            panel.classList.toggle('show');
+            if (panel.classList.contains('show')) {
+                initDatePicker();
+            }
+        }
+
+        function saveStartDate() {
+            const input = document.getElementById('startDateInput');
+            const newDate = input.value;
+            if (!newDate) return alert('请选择一个日期');
+            saveStartDateToStorage(newDate);
+            updateDaysCounter();
+            document.getElementById('datePickerPanel').classList.remove('show');
+        }
+
+        updateDaysCounter();
+
+        // ========== 打卡数据 ==========
+        const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        
+        let weekData = JSON.parse(localStorage.getItem('weekCheckData'));
+        if (!weekData || weekData.length !== 7) {
+            weekData = [false, false, false, false, false, false, false];
+            localStorage.setItem('weekCheckData', JSON.stringify(weekData));
+        }
+
+        function renderWeekGrid() {
+            const grid = document.getElementById('week-grid');
+            grid.innerHTML = '';
+            const monday = getMondayOfCurrentWeek();
+            const weekDates = getWeekDatesFromMonday(monday);
+            
+            DAYS.forEach((day, idx) => {
+                const completed = weekData[idx];
+                const dateObj = weekDates[idx];
+                
+                const card = document.createElement('div');
+                card.className = 'day-card';
+                
+                const dayName = document.createElement('div');
+                dayName.className = 'day-name';
+                dayName.textContent = day;
+                
+                const dayDate = document.createElement('div');
+                dayDate.className = 'day-date';
+                dayDate.textContent = formatShortDate(dateObj);
+                
+                const status = document.createElement('div');
+                status.className = 'day-status';
+                status.textContent = completed ? '✅ 已完成' : '⭕ 未打卡';
+                
+                const btn = document.createElement('button');
+                btn.className = 'check-btn' + (completed ? ' completed' : '');
+                btn.textContent = completed ? '已打卡' : '打卡';
+                btn.onclick = () => { 
+                    weekData[idx] = !weekData[idx];
+                    localStorage.setItem('weekCheckData', JSON.stringify(weekData));
+                    renderWeekGrid();
+                };
+                
+                card.appendChild(dayName);
+                card.appendChild(dayDate);
+                card.appendChild(status);
+                card.appendChild(btn);
+                grid.appendChild(card);
+            });
+        }
+
+        function resetWeek() {
+            if (confirm('确定要重置本周所有打卡记录吗？')) {
+                weekData = [false, false, false, false, false, false, false];
+                localStorage.setItem('weekCheckData', JSON.stringify(weekData));
+                renderWeekGrid();
+            }
+        }
+
+        renderWeekGrid();
+    </script>
+</body>
+</html>
